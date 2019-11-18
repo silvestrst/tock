@@ -124,7 +124,7 @@ macro_rules! register_bitfields {
         $(
             #[allow(non_snake_case)]
             $(#[$inner])*
-            pub mod $reg {
+            mod $reg {
                 #[derive(Clone, Copy)]
                 pub struct Register;
                 impl $crate::registers::RegisterLongName for Register {}
