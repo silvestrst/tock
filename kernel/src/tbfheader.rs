@@ -178,18 +178,23 @@ impl TbfHeader {
     }
 }
 
+#[allow(clippy::cast_ptr_alignment)]
+crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfHeader> {
+    parse_and_validate_tbf_header_internal(address)
+}
+
 /// Converts a pointer to memory to a TbfHeader struct
 ///
 /// This function takes a pointer to arbitrary memory and optionally returns a
 /// TBF header struct. This function will validate the header checksum, but does
 /// not perform sanity or security checking on the structure.
 #[allow(clippy::cast_ptr_alignment)]
-crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfHeader> {
-    let version = *(address as *const u16);
+crate fn parse_and_validate_tbf_header_internal(address: *const u8) -> Option<TbfHeader> {
+    let version = unsafe { *(address as *const u16) };
 
     match version {
         2 => {
-            let tbf_header_base = &*(address as *const TbfHeaderV2Base);
+            let tbf_header_base = unsafe { &*(address as *const TbfHeaderV2Base) };
 
             // Some sanity checking. Make sure the header isn't longer than the
             // total app. Make sure the total app fits inside a reasonable size
@@ -208,7 +213,7 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
                 chunks += 1;
             }
             let mut checksum: u32 = 0;
-            let header = slice::from_raw_parts(address as *const u32, chunks);
+            let header = unsafe { slice::from_raw_parts(address as *const u32, chunks) };
             for (i, chunk) in header.iter().enumerate() {
                 if i == 3 {
                     // Skip the checksum field.
@@ -248,7 +253,7 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
 
                 // Loop through the header looking for known options.
                 while remaining_length > mem::size_of::<TbfHeaderTlv>() {
-                    let tbf_tlv_header = &*(address.offset(offset) as *const TbfHeaderTlv);
+                    let tbf_tlv_header = unsafe { &*(address.offset(offset) as *const TbfHeaderTlv) };
 
                     remaining_length -= mem::size_of::<TbfHeaderTlv>();
                     offset += mem::size_of::<TbfHeaderTlv>() as isize;
@@ -268,7 +273,7 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
                                         == mem::size_of::<TbfHeaderV2Main>()
                                 {
                                     let tbf_main =
-                                        &*(address.offset(offset) as *const TbfHeaderV2Main);
+                                        unsafe { &*(address.offset(offset) as *const TbfHeaderV2Main) };
                                     main_pointer = Some(tbf_main);
                                 }
                             }
@@ -282,10 +287,10 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
                                 {
                                     let number_regions = tbf_tlv_header.length as usize
                                         / mem::size_of::<TbfHeaderV2WriteableFlashRegion>();
-                                    let region_start = &*(address.offset(offset)
-                                        as *const TbfHeaderV2WriteableFlashRegion);
+                                    let region_start = unsafe { &*(address.offset(offset)
+                                        as *const TbfHeaderV2WriteableFlashRegion) };
                                     let regions =
-                                        slice::from_raw_parts(region_start, number_regions);
+                                        unsafe { slice::from_raw_parts(region_start, number_regions) };
                                     wfr_pointer = Some(regions);
                                 }
                             }
@@ -293,10 +298,10 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
                             /* Package Name */
                             {
                                 if remaining_length >= tbf_tlv_header.length as usize {
-                                    let package_name_byte_array = slice::from_raw_parts(
+                                    let package_name_byte_array = unsafe { slice::from_raw_parts(
                                         address.offset(offset),
                                         tbf_tlv_header.length as usize,
-                                    );
+                                    ) };
                                     let _ =
                                         str::from_utf8(package_name_byte_array).map(|name_str| {
                                             app_name_str = name_str;
