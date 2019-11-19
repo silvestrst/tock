@@ -178,6 +178,10 @@ impl TbfHeader {
     }
 }
 
+crate fn parse_tbf_header_lengths(start: &'static mut [u8]) -> Option<(u32, u32)> {
+
+}
+
 #[allow(clippy::cast_ptr_alignment)]
 crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfHeader> {
     parse_and_validate_tbf_header_internal(address)
