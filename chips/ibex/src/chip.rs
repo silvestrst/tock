@@ -5,6 +5,7 @@ use core::hint::unreachable_unchecked;
 
 use kernel;
 use kernel::common::registers::FieldValue;
+use kernel::common::StaticRef;
 use kernel::debug;
 use kernel::Chip;
 use rv32i::csr::{mcause, mie::mie, mip::mip, mtvec::mtvec, CSR};
@@ -19,18 +20,40 @@ use crate::timer;
 use crate::uart;
 use crate::usbdev;
 
+use lowrisc::uart::{Uart, UartRegisters};
+
 pub const CHIP_FREQ: u32 = 50_000_000;
 
-pub struct Ibex {
-    userspace_kernel_boundary: SysCall,
-    pmp: rv32i::pmp::PMPConfig,
+// Chip configuration based on the target device.
+pub struct Config {
+    pub name: &'static str,
+    pub chip_freq: u32,
+    pub uart_baudrate: u32,
 }
 
-impl Ibex {
-    pub unsafe fn new() -> Ibex {
+pub struct Peripherals<'a> {
+    pub uart0: Uart<'a>,
+}
+
+pub struct Ibex<'a> {
+    userspace_kernel_boundary: SysCall,
+    pmp: rv32i::pmp::PMPConfig,
+    pub peripherals: Peripherals<'a>,
+    pub chip_config: Config,
+}
+
+impl<'a> Ibex<'a> {
+    pub unsafe fn new(config: Config) -> Ibex<'a> {
+        let uart0_base: StaticRef<UartRegisters> =
+            StaticRef::new(0x4000_0000 as *const UartRegisters);
+
         Ibex {
             userspace_kernel_boundary: SysCall::new(),
             pmp: rv32i::pmp::PMPConfig::new(4),
+            peripherals: Peripherals {
+                uart0: Uart::new(uart0_base, config.chip_freq),
+            },
+            chip_config: config,
         }
     }
 
@@ -103,7 +126,7 @@ impl Ibex {
     }
 }
 
-impl kernel::Chip for Ibex {
+impl kernel::Chip for Ibex<'_> {
     type MPU = rv32i::pmp::PMPConfig;
     type UserspaceKernelBoundary = SysCall;
     type SysTick = ();

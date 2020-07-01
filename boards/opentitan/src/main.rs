@@ -18,11 +18,21 @@ use kernel::Platform;
 use kernel::{create_capability, debug, static_init};
 use rv32i::csr;
 
+use ibex::chip;
+
 #[allow(dead_code)]
 mod aes_test;
 
 pub mod io;
 pub mod usb;
+
+//#[cfg(feature = "config_sim_verilator")]
+const CONFIG: chip::Config = chip::Config {
+    name: &"sim_verilator",
+    chip_freq: 500_000,
+    uart_baudrate: 9600,
+};
+
 //
 // Actual memory for holding the active process structures. Need an empty list
 // at least.
@@ -125,7 +135,8 @@ pub unsafe fn reset_handler() {
         None,
     );
 
-    let chip = static_init!(ibex::chip::Ibex, ibex::chip::Ibex::new());
+    let config = CONFIG;
+    let chip = static_init!(ibex::chip::Ibex, ibex::chip::Ibex::new(config));
     CHIP = Some(chip);
 
     // Need to enable all interrupts for Tock Kernel
@@ -138,8 +149,8 @@ pub unsafe fn reset_handler() {
 
     // Create a shared UART channel for the console and for kernel debug.
     let uart_mux = components::console::UartMuxComponent::new(
-        &ibex::uart::UART0,
-        230400,
+        &chip.peripherals.uart0,
+        chip.chip_config.uart_baudrate,
         dynamic_deferred_caller,
     )
     .finalize(());
